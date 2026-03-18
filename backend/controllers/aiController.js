@@ -36,4 +36,13 @@ async function improveContent(req, res, next) {
   }
 }
 
-module.exports = { generateResume, improveContent };
+async function listModels(req, res, next) {
+  try {
+    const models = await geminiService.listModels();
+    res.json({ models });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { generateResume, improveContent, listModels };

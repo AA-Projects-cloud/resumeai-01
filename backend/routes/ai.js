@@ -7,6 +7,7 @@ const aiController = require('../controllers/aiController');
 router.use(requireAuth);
 router.use(aiLimiter);
 
+router.get('/models', aiController.listModels);
 router.post('/generate', aiController.generateResume);
 router.post('/improve', aiController.improveContent);
 

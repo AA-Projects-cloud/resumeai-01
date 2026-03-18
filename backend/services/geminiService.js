@@ -257,4 +257,14 @@ function calculateStrengthScore(resumeData) {
   return Math.min(score, 100);
 }
 
-module.exports = { generateFullResume, improveContent };
+async function listModels() {
+  try {
+    const list = await ai.listModels();
+    return list.models.map(m => m.name);
+  } catch (err) {
+    console.error('List models error:', err.message);
+    throw err;
+  }
+}
+
+module.exports = { generateFullResume, improveContent, listModels };
