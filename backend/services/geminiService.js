@@ -1,6 +1,6 @@
 const ai = require('../config/gemini');
 
-const GEMINI_MODEL = 'gemini-pro';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 /**
  * Build a structured prompt describing the user's resume data
@@ -52,94 +52,23 @@ function buildResumeContext(resumeData) {
 async function generateFullResume({ resumeData, resumeType, tone, jobRole }) {
   const context = buildResumeContext(resumeData);
 
-  const toneInstructions = {
-    professional: 'Use formal, polished, professional language. Emphasize achievements and responsibilities clearly.',
-    simple: 'Use clear, easy-to-read language. Keep sentences short and direct.',
-    impact: 'Use powerful action verbs and quantify impact wherever possible. Make every bullet point results-driven.',
-  };
-
-  const typeInstructions = {
-    fresher: 'Focus on education, academic achievements, projects, internships (if any), and technical skills. Keep it concise and impactful.',
-    developer: 'Emphasize technical skills, programming languages, frameworks, projects, and development experience with measurable outcomes.',
-    internship: 'Highlight academic performance, relevant coursework, projects, certifications, and eagerness to learn.',
-    experienced: 'Prioritize work experience, achievements, leadership, and measurable impact. Show clear career progression.',
-  };
-
   const systemInstructions = `
 You are an expert ATS-optimized resume writer and professional document formatter.
-
-Your task is to generate a clean, modern, and highly professional resume in plain text format with PERFECT alignment and structure similar to top-tier resumes.
-
+Your task is to generate a clean, modern, and highly professional resume in plain text format.
 STRICT FORMATTING RULES:
-
-1. Output ONLY resume content — no explanations, no extra text.
-2. Start DIRECTLY with:
-   FULL NAME (CENTER-ALIGNED STYLE USING SPACING)
-   Professional Title
-   Contact Information (single line)
-
-3. Use consistent spacing and alignment to mimic a professionally designed resume.
-
-4. Section formatting:
-   - Use ALL CAPS for section titles
-   - Add a horizontal divider using:
-     --------------------------------------------------
-   - Maintain equal spacing before and after each section
-
-5. Use bullet points:
-   • Start each bullet with strong action verbs
-   • Keep points concise (1–2 lines max)
-   • Include measurable achievements (%, numbers, impact)
-
-6. Maintain clean hierarchy:
-   Job Title
-   Company Name, Location                          Dates (right-aligned style)
-   
-7. Ensure proper alignment using spacing (IMPORTANT):
-   - Dates should appear visually right-aligned
-   - Sections must look balanced and symmetrical
-   - Avoid uneven spacing
-
-8. Resume structure (follow strictly):
-   - Name + Contact
-   - PROFESSIONAL SUMMARY
-   - WORK EXPERIENCE
-   - EDUCATION
-   - SKILLS
-   - CERTIFICATIONS (if applicable)
-   - PROJECTS (if applicable)
-
-9. Writing guidelines:
-   - Use industry keywords for ATS optimization
-   - Avoid paragraphs longer than 3 lines
-   - Use professional, concise language
-   - No personal pronouns (I, me, my)
-
-10. DO NOT include:
-   - Any markdown (**, #, etc.)
-   - Any HTML
-   - Emojis or symbols except bullet (•)
-   - Explanations or notes
-
-11. Ensure the resume fits within 1–1.5 pages when printed.
-
-12. The final output must look like a real professionally formatted resume when pasted into Word or PDF.
-
-IMPORTANT:
-The resume must visually resemble a clean, structured format like a corporate-level resume with proper alignment and spacing — NOT just plain text blocks.
+1. Output ONLY resume content.
+2. Section titles in ALL CAPS.
+3. Use bullet points (•).
+4. Maintain proper alignment and spacing.
 `;
 
-  const userPrompt = `Please generate a complete, ATS-optimized resume using the following information:
-
-${context}
-
-CRITICAL: Provide ONLY the resume text. No introductory or concluding remarks.`;
+  const userPrompt = `${systemInstructions}\n\nPlease generate a complete, ATS-optimized resume using the following information:\n\n${context}\n\nCRITICAL: Provide ONLY the resume text.`;
 
   try {
-    const model = ai.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: systemInstructions });
-    const response = await model.generateContent(userPrompt);
-    const result = await response.response;
-    let text = result.text();
+    const model = ai.getGenerativeModel({ model: GEMINI_MODEL });
+    const result = await model.generateContent(userPrompt);
+    const response = await result.response;
+    let text = response.text();
     
     // Clean the response from any leftover conversational filler
     text = cleanAiResponse(text);
