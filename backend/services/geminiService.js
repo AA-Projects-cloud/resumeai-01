@@ -1,6 +1,6 @@
 const ai = require('../config/gemini');
 
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash-latest';
 
 /**
  * Build a structured prompt describing the user's resume data
