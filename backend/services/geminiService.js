@@ -1,6 +1,6 @@
 const ai = require('../config/gemini');
 
-const GEMINI_MODEL = 'gemini-3-flash-preview';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 /**
  * Build a structured prompt describing the user's resume data
@@ -136,13 +136,10 @@ ${context}
 CRITICAL: Provide ONLY the resume text. No introductory or concluding remarks.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      systemInstruction: systemInstructions,
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-    });
-
-    let text = response.text;
+    const model = ai.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: systemInstructions });
+    const response = await model.generateContent(userPrompt);
+    const result = await response.response;
+    let text = result.text();
     
     // Clean the response from any leftover conversational filler
     text = cleanAiResponse(text);
@@ -219,13 +216,11 @@ async function improveContent({ content, type, tone }) {
   const prompt = prompts[type] || prompts.bullet;
 
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      systemInstruction: 'You are an expert resume writer. Return only the improved content, no explanations.',
-      contents: [{ role: 'user', parts: [{ text: `${prompt}\n\nContent:\n${content}` }] }],
-    });
+    const model = ai.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: 'You are an expert resume writer. Return only the improved content, no explanations.' });
+    const response = await model.generateContent(`${prompt}\n\nContent:\n${content}`);
+    const result = await response.response;
+    return result.text() || content;
     
-    return response.text || content;
   } catch (err) {
     console.error('Gemini improve error:', err.message);
     throw new Error(`AI improvement failed: ${err.message}`);
