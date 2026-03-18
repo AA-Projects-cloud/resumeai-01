@@ -1,6 +1,72 @@
 const ai = require('../config/gemini');
 
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const MODELS_TO_TRY = [
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-pro',
+  'gemini-pro'
+];
+
+/**
+ * Helper to call Gemini with multiple fallback models and direct REST API recovery
+ */
+async function callGeminiWithFallback(prompt, systemInstruction = '') {
+  let lastError = null;
+
+  // 1. Try SDK with multiple models
+  for (const modelName of MODELS_TO_TRY) {
+    try {
+      console.log(`🤖 Attempting AI generation with model: ${modelName}...`);
+      const model = ai.getGenerativeModel({ model: modelName });
+      
+      const result = await model.generateContent(
+        systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt
+      );
+      const response = await result.response;
+      const text = response.text();
+      
+      if (text) {
+        console.log(`✅ AI generation successful with model: ${modelName}`);
+        return text;
+      }
+    } catch (err) {
+      console.warn(`⚠️ Model ${modelName} failed: ${err.message}`);
+      lastError = err;
+    }
+  }
+
+  // 2. Final Fallback: Direct REST API call (bypasses SDK quirks)
+  console.log('🚀 All SDK models failed. Attempting direct REST API fallback...');
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY is missing');
+
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt }] }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.log('✅ AI generation successful via direct REST API (v1/gemini-1.5-flash)');
+      return data.candidates[0].content.parts[0].text;
+    }
+    
+    if (data.error) {
+      throw new Error(`REST API Error: ${data.error.message}`);
+    }
+  } catch (restErr) {
+    console.error('❌ Direct REST API fallback also failed:', restErr.message);
+    lastError = restErr;
+  }
+
+  throw new Error(`All AI generation attempts failed. Last error: ${lastError?.message}`);
+}
 
 /**
  * Build a structured prompt describing the user's resume data
@@ -62,21 +128,12 @@ STRICT FORMATTING RULES:
 4. Maintain proper alignment and spacing.
 `;
 
-  const userPrompt = `${systemInstructions}\n\nPlease generate a complete, ATS-optimized resume using the following information:\n\n${context}\n\nCRITICAL: Provide ONLY the resume text.`;
+  const userPrompt = `Please generate a complete, ATS-optimized resume using the following information:\n\n${context}\n\nCRITICAL: Provide ONLY the resume text.`;
 
   try {
-    const model = ai.getGenerativeModel({ model: GEMINI_MODEL });
-    const result = await model.generateContent(userPrompt);
-    const response = await result.response;
-    let text = response.text();
-    
-    // Clean the response from any leftover conversational filler
-    text = cleanAiResponse(text);
-
-    // Calculate a basic strength score based on sections filled
+    const text = await callGeminiWithFallback(userPrompt, systemInstructions);
     const strengthScore = calculateStrengthScore(resumeData);
-
-    return { text, strengthScore };
+    return { text: cleanAiResponse(text), strengthScore };
   } catch (err) {
     console.error('Gemini API error:', err.message);
     throw new Error(`AI generation failed: ${err.message}`);
@@ -145,10 +202,8 @@ async function improveContent({ content, type, tone }) {
   const prompt = prompts[type] || prompts.bullet;
 
   try {
-    const model = ai.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: 'You are an expert resume writer. Return only the improved content, no explanations.' });
-    const response = await model.generateContent(`${prompt}\n\nContent:\n${content}`);
-    const result = await response.response;
-    return result.text() || content;
+    const text = await callGeminiWithFallback(`${prompt}\n\nContent:\n${content}`, 'You are an expert resume writer. Return only the improved content, no explanations.');
+    return text || content;
     
   } catch (err) {
     console.error('Gemini improve error:', err.message);
