@@ -1,13 +1,19 @@
 const ai = require('../config/gemini');
 
 const MODELS_TO_TRY = [
+  'gemini-3-flash',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   'gemini-2.5-pro',
-  'gemini-3-flash',
-  'gemini-1.5-flash-latest',
   'gemini-1.5-pro',
   'gemini-pro'
+];
+
+const REST_FALLBACK_MODELS = [
+  'gemini-3-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-1.5-pro'
 ];
 
 /**
@@ -54,33 +60,49 @@ async function callGeminiWithFallback(prompt, systemInstruction = '') {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY is missing');
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-    
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt }] }]
-      })
-    });
+    const directPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
 
-    const data = await res.json();
-    if (data.error) {
-      throw new Error(`REST API Error: ${data.error.message}`);
+    for (const modelName of REST_FALLBACK_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateText?key=${apiKey}`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: directPrompt,
+            temperature: 0.85,
+            max_output_tokens: 900
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          throw new Error(`REST API Error: ${data.error.message}`);
+        }
+
+        const restText =
+          data?.candidates?.[0]?.content?.[0]?.parts?.[0]?.text ||
+          data?.candidates?.[0]?.text ||
+          data?.output?.[0]?.content?.[0]?.text ||
+          data?.text ||
+          null;
+
+        if (restText && restText.trim()) {
+          console.log(`✅ AI generation successful via REST API model ${modelName}`);
+          return restText.trim();
+        }
+
+        console.warn(`⚠️ REST model ${modelName} returned no text; trying next model.`);
+      } catch (restErr) {
+        console.warn(`⚠️ REST model ${modelName} failed: ${restErr.message}`);
+        lastError = restErr;
+        continue;
+      }
     }
 
-    const restText =
-      data?.candidates?.[0]?.content?.[0]?.parts?.[0]?.text ||
-      data?.candidates?.[0]?.text ||
-      data?.text ||
-      null;
-
-    if (restText && restText.trim()) {
-      console.log('✅ AI generation successful via direct REST API (v1beta/gemini-2.5-flash)');
-      return restText.trim();
-    }
-
-    throw new Error('REST API response did not include generated text');
+    throw new Error('REST API fallback tried all candidate models but none returned generated text');
   } catch (restErr) {
     console.error('❌ Direct REST API fallback also failed:', restErr.message);
     lastError = restErr;
