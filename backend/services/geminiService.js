@@ -26,11 +26,21 @@ async function callGeminiWithFallback(prompt, systemInstruction = '') {
         systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt
       );
       const response = await result.response;
-      const text = response.text();
-      
-      if (text) {
+
+      let text = null;
+      if (response?.text && typeof response.text === 'function') {
+        text = await response.text();
+      } else if (typeof response === 'string') {
+        text = response;
+      } else if (response?.candidates?.[0]?.content?.[0]?.parts?.[0]?.text) {
+        text = response.candidates[0].content[0].parts[0].text;
+      } else if (response?.candidates?.[0]?.text) {
+        text = response.candidates[0].text;
+      }
+
+      if (text && text.trim()) {
         console.log(`✅ AI generation successful with model: ${modelName}`);
-        return text;
+        return text.trim();
       }
     } catch (err) {
       console.warn(`⚠️ Model ${modelName} failed: ${err.message}`);
@@ -55,12 +65,22 @@ async function callGeminiWithFallback(prompt, systemInstruction = '') {
     });
 
     const data = await res.json();
-      console.log('✅ AI generation successful via direct REST API (v1beta/gemini-2.5-flash)');
-      return data.candidates[0].content.parts[0].text;
-    
     if (data.error) {
       throw new Error(`REST API Error: ${data.error.message}`);
     }
+
+    const restText =
+      data?.candidates?.[0]?.content?.[0]?.parts?.[0]?.text ||
+      data?.candidates?.[0]?.text ||
+      data?.text ||
+      null;
+
+    if (restText && restText.trim()) {
+      console.log('✅ AI generation successful via direct REST API (v1beta/gemini-2.5-flash)');
+      return restText.trim();
+    }
+
+    throw new Error('REST API response did not include generated text');
   } catch (restErr) {
     console.error('❌ Direct REST API fallback also failed:', restErr.message);
     lastError = restErr;
