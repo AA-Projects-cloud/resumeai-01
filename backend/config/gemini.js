@@ -1,11 +1,14 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '', 'v1');
+const apiKey = process.env.GEMINI_API_KEY;
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn('⚠️ WARNING: GEMINI_API_KEY is not defined in environment variables!');
+if (!apiKey) {
+  console.error('❌ CRITICAL: GEMINI_API_KEY is missing in process.env!');
 } else {
-  console.log('✅ GEMINI_API_KEY is loaded (starts with:', process.env.GEMINI_API_KEY.substring(0, 6) + '...)');
+  console.log('✅ GEMINI_API_KEY found (starts with:', apiKey.substring(0, 8) + '...)');
 }
+
+// In current SDK version, only API key should be passed to constructor
+const ai = new GoogleGenerativeAI(apiKey || '');
 
 module.exports = ai;

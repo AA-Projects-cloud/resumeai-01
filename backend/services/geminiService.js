@@ -1,7 +1,10 @@
 const ai = require('../config/gemini');
 
 const MODELS_TO_TRY = [
-  'gemini-1.5-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+  'gemini-3-flash',
   'gemini-1.5-flash-latest',
   'gemini-1.5-pro',
   'gemini-pro'
@@ -41,7 +44,7 @@ async function callGeminiWithFallback(prompt, systemInstruction = '') {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY is missing');
 
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
     
     const res = await fetch(url, {
       method: 'POST',
@@ -52,10 +55,8 @@ async function callGeminiWithFallback(prompt, systemInstruction = '') {
     });
 
     const data = await res.json();
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      console.log('✅ AI generation successful via direct REST API (v1/gemini-1.5-flash)');
+      console.log('✅ AI generation successful via direct REST API (v1beta/gemini-2.5-flash)');
       return data.candidates[0].content.parts[0].text;
-    }
     
     if (data.error) {
       throw new Error(`REST API Error: ${data.error.message}`);

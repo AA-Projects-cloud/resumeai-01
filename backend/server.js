@@ -1,6 +1,25 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env.local') });
-require('dotenv').config();
+const dotenv = require('dotenv');
+
+// Load environment variables from .env.local first
+const envPath = path.join(__dirname, '.env.local');
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.warn(`⚠️  Could not load .env.local from ${envPath}:`, result.error.message);
+} else {
+  console.log('✅ Loaded environment variables from .env.local');
+}
+
+// Fallback to standard .env
+dotenv.config();
+
+// Debug logs (Safe versions)
+console.log('🔍 Environment Check:');
+console.log('   - PORT:', process.env.PORT || '3001 (default)');
+console.log('   - SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Found' : '❌ Missing');
+console.log('   - GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ Found' : '❌ Missing');
+console.log('   - NODE_ENV:', process.env.NODE_ENV || 'development');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
